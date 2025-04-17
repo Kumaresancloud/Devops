@@ -124,9 +124,14 @@ resource "aws_sqs_queue_policy" "sqs_policy" {
   })
 }
 
-resource "aws_sns_topic_subscription" "sqs_subscription" {
+data "aws_sns_topic" "sns_topic_from_a" {
   provider = aws.account_b
-  topic_arn = "arn:aws:sns:us-east-1:541153896426:sns_topic"
+  arn      = "arn:aws:sns:us-east-1:541153896426:cross-account-topic"
+}
+
+resource "aws_sns_topic_subscription" "sqs_subscription" {
+  provider  = aws.account_b
+  topic_arn = data.aws_sns_topic.sns_topic_from_a.arn
   protocol  = "sqs"
   endpoint  = aws_sqs_queue.sqs_queue.arn
 }
