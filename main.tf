@@ -48,42 +48,42 @@ resource "aws_iam_policy" "sns_publish_policy" {
   provider = aws.account_a
   name = "sns-publish-policy"
   policy = jsonencode({
-    "Version": "2008-10-17",
-    "Id": "SNS",
-    "Statement": [
-      {
-        "Sid": "__default_statement_ID",
-        "Effect": "Allow",
-        "Principal": {
-          "AWS": "*"
-        },
-        "Action": [
-          "SNS:Publish",
-          "SNS:RemovePermission",
-          "SNS:SetTopicAttributes",
-          "SNS:DeleteTopic",
-          "SNS:ListSubscriptionsByTopic",
-          "SNS:GetTopicAttributes",
-          "SNS:AddPermission",
-          "SNS:Subscribe"
-        ],
-        "Resource": aws_sns_topic.sns_topic.arn,
-        "Condition": {
-          "StringEquals": {
-            "AWS:SourceOwner": "541153896426"
-          }
-        }
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DefaultStatementID",  # ✅ Only alphanumeric
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "*"
       },
-      {
-        "Effect": "Allow",
-        "Principal": {
-          "AWS": "arn:aws:iam::568812757521:root"
-        },
-        "Action": "sns:Subscribe",
-        "Resource": aws_sns_topic.sns_topic.arn
+      "Action": [
+        "SNS:Publish",
+        "SNS:RemovePermission",
+        "SNS:SetTopicAttributes",
+        "SNS:DeleteTopic",
+        "SNS:ListSubscriptionsByTopic",
+        "SNS:GetTopicAttributes",
+        "SNS:AddPermission",
+        "SNS:Subscribe"
+      ],
+      "Resource": aws_sns_topic.sns_topic.arn,
+      "Condition": {
+        "StringEquals": {
+          "AWS:SourceOwner": "541153896426"
+        }
       }
-    ]
-  })
+    },
+    {
+      "Sid": "AllowAccountBToSubscribe",  # ✅ Also valid
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::568812757521:root"
+      },
+      "Action": "sns:Subscribe",
+      "Resource": aws_sns_topic.sns_topic.arn
+    }
+  ]
+})
 }
 
 resource "aws_iam_role_policy_attachment" "sns_policy_attachment" {
