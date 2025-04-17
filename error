@@ -1,1 +1,32 @@
+Write a bash script using AWS CLI to identify all RDS instances missing a given tag (missing tag called “RPO”).  
+The script should then generate a report in csv format with the following columns: 
+•	AWS Account number 
+•	AWS Region Name 
+•	RDS Instance Identifier 
+•	RDS Instance size 
+ 
+Test Case 3: List S3 buckets where replication is enabled 
+Use the lab account to perform the below using a bash script & aws cli 
+1. Identify all s3 buckets where replication is enabled 
+2. List only those buckets where the replication role is missing the AWS managed “S3FullAccess” policy 
+3. Remediate such roles, identified in step 2, by attaching the S3FullAccess policy 
+ 
+Test Case 4: Identify Load Balancers with HTTP Listeners 
+Write script using bash and aws cli for the following: 
+1. Identify all load balancers in the awsuat account that have only HTTP listeners 
+2. Create a csv file with the following headers (and list LB attributes under those headers):  
+                  Region, LB Name, app, bu, env, Security group id, number_of_targets 
+3. Run this bash script using Jenkins (via Jenkinsfile) and email the csv file to your Guardian email address 
+ 
+ 
+Test Case 5: Deploy test web application in the EKS cluster 
+You can use the devops test eks cluster in the ‘awsuat’ account of Guardian for this test case. 
+ 
+1. Create a namespace dev-nginx 
+2. Create a deployment using replica set of size 2 using the nginx image within the custom namespace 
+3. Create a service 
+3. Deploy an ingress with Application Load Balancer within the custom namespace 
+4. When accessing the name nginx-app.dev.aws.glic.com, confirm that the browser renders the standard nginx test page. 
+5. Page should show "Hello to nginx!" in place of the default "Welcome to nginx!" 
+6. Use devops cluster and nginx public image 
 
