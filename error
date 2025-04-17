@@ -1,0 +1,13 @@
+ Error: reading SNS Topic (arn:aws:sns:us-east-1:248521096457:cross-account-topic): operation error SNS: GetTopicAttributes, https response error StatusCode: 403, RequestID: bf0490bd-384a-59a4-9009-f0c60d34c226, AuthorizationError: User: arn:aws:iam::541153896426:root is not authorized to perform: SNS:GetTopicAttributes on resource: arn:aws:sns:us-east-1:248521096457:cross-account-topic because no resource-based policy allows the SNS:GetTopicAttributes action
+│
+│   with aws_sns_topic.sns_topic,
+│   on main.tf line 6, in resource "aws_sns_topic" "sns_topic":
+│    6: resource "aws_sns_topic" "sns_topic" {
+│
+╵
+╷
+│ Error: reading SNS Topic (arn:aws:sns:us-east-1:541153896426:cross-account-topic): empty result
+│
+│   with data.aws_sns_topic.sns_topic_from_a,
+│   on main.tf line 127, in data "aws_sns_topic" "sns_topic_from_a":
+│  127: data "aws_sns_topic" "sns_topic_from_a" {
