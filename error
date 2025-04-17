@@ -1,5 +1,1 @@
-Error: creating IAM Policy (sns-publish-policy): operation error IAM: CreatePolicy, https response error StatusCode: 400, RequestID: 64584773-4d5e-4646-a5c0-ade959ea4d55, MalformedPolicyDocument: Policy document should not specify a principal.
-│
-│   with aws_iam_policy.sns_publish_policy,
-│   on main.tf line 47, in resource "aws_iam_policy" "sns_publish_policy":
-│   47: resource "aws_iam_policy" "sns_publish_policy" {
+EC2 Instance Connect is unable to connect to your instance. Ensure your instance network settings are configured correctly for EC2 Instance Connect. For more information, see EC2 Instance Connect Prerequisites at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-connect-prerequisites.html.
