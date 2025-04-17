@@ -1,14 +1,5 @@
-╷
-│ Error: creating IAM Policy (sns-publish-policy): operation error IAM: CreatePolicy, https response error StatusCode: 400, RequestID: 8d04ead1-28cf-4b43-a23c-250c458798a4, MalformedPolicyDocument: Policy document must be version 2012-10-17 or greater.
+Error: creating IAM Policy (sns-publish-policy): operation error IAM: CreatePolicy, https response error StatusCode: 400, RequestID: 949e786e-cfce-4ab7-ad1f-255cd6b6e8da, MalformedPolicyDocument: Statement IDs (SID) must be alpha-numeric. Check that your input satisfies the regular expression [0-9A-Za-z]*
 │
 │   with aws_iam_policy.sns_publish_policy,
-│   on main.tf line 26, in resource "aws_iam_policy" "sns_publish_policy":
-│   26: resource "aws_iam_policy" "sns_publish_policy" {
-│
-╵
-╷
-│ Error: creating SNS Topic Subscription: operation error SNS: Subscribe, https response error StatusCode: 403, RequestID: 102a57ea-b7ed-58b6-b29b-37918f8983cc, AuthorizationError: User: arn:aws:iam::568812757521:root is not authorized to perform: SNS:Subscribe on resource: arn:aws:sns:us-east-1:541153896426:cross-account-topic because no resource-based policy allows the SNS:Subscribe action
-│
-│   with aws_sns_topic_subscription.sqs_subscription,
-│   on main.tf line 132, in resource "aws_sns_topic_subscription" "sqs_subscription":
-│  132: resource "aws_sns_topic_subscription" "sqs_subscription" {
+│   on main.tf line 47, in resource "aws_iam_policy" "sns_publish_policy":
+│   47: resource "aws_iam_policy" "sns_publish_policy" {
