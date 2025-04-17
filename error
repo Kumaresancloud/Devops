@@ -1,4 +1,4 @@
-Error: creating IAM Policy (sns-publish-policy): operation error IAM: CreatePolicy, https response error StatusCode: 400, RequestID: 949e786e-cfce-4ab7-ad1f-255cd6b6e8da, MalformedPolicyDocument: Statement IDs (SID) must be alpha-numeric. Check that your input satisfies the regular expression [0-9A-Za-z]*
+Error: creating IAM Policy (sns-publish-policy): operation error IAM: CreatePolicy, https response error StatusCode: 400, RequestID: 64584773-4d5e-4646-a5c0-ade959ea4d55, MalformedPolicyDocument: Policy document should not specify a principal.
 │
 │   with aws_iam_policy.sns_publish_policy,
 │   on main.tf line 47, in resource "aws_iam_policy" "sns_publish_policy":
