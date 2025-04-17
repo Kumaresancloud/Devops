@@ -7,7 +7,28 @@ resource "aws_sns_topic" "sns_topic" {
   provider = aws.account_a
   name = "cross-account-topic"
 }
+resource "aws_sns_topic_policy" "allow_account_b" {
+  provider = aws.account_a
+  arn      = aws_sns_topic.sns_topic.arn
 
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "AllowAccountBToSubscribe",
+        Effect   = "Allow",
+        Principal = {
+          AWS = "arn:aws:iam::568812757521:root" # 👈 Account B root
+        },
+        Action   = [
+          "SNS:Subscribe",
+          "SNS:GetTopicAttributes"
+        ],
+        Resource = aws_sns_topic.sns_topic.arn
+      }
+    ]
+  })
+}
 # IAM Role for EC2 to publish to SNS
 resource "aws_iam_role" "ec2_publish_role" {
   provider = aws.account_a
