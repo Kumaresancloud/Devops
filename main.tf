@@ -112,7 +112,7 @@ resource "aws_sqs_queue_policy" "sqs_policy" {
     Version = "2012-10-17",
     Statement = [{
       Effect = "Allow",
-      Principal = { AWS = "arn:aws:iam::541153896426:root" },
+      Principal = "*",
       Action = "sqs:SendMessage",
       Resource = aws_sqs_queue.sqs_queue.arn,
       Condition = {
@@ -122,6 +122,13 @@ resource "aws_sqs_queue_policy" "sqs_policy" {
       }
     }]
   })
+}
+
+resource "aws_sns_topic_subscription" "sqs_subscription" {
+  provider = aws.account_b
+  topic_arn = "arn:aws:sns:us-east-1:541153896426:sns_topic"
+  protocol  = "sqs"
+  endpoint  = aws_sqs_queue.sqs_queue.arn
 }
 
 # EC2 Role to Read from SQS
