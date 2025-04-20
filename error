@@ -1,2 +1,4 @@
-An error occurred (InvalidParameterValue) when calling the ListTagsForResource operation: The specified resource name does not match an RDS resource in this region.
+1. Identify all s3 buckets where replication is enabled 
+2. List only those buckets where the replication role is missing the AWS managed “S3FullAccess” policy 
+3. Remediate such roles, identified in step 2, by attaching the S3FullAccess policy 
 
