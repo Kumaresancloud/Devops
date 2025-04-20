@@ -1,37 +1,46 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-# Output CSV file
 REPORT_FILE="rds_missing_rpo_report.csv"
-
-# Write headers
 echo "AWS Account ID,Region,RDS Instance ID,Instance Class" > "$REPORT_FILE"
 
-# Get current account ID
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
-# Get all AWS regions
 REGIONS=$(aws ec2 describe-regions --query "Regions[].RegionName" --output text)
 
 for REGION in $REGIONS; do
-  echo "Checking region: $REGION"
-  DB_INSTANCES=$(aws rds describe-db-instances --region "$REGION" --query "DBInstances[].DBInstanceIdentifier" --output text)
+  echo "🔍 Checking region: $REGION"
 
-  for DB_ID in $DB_INSTANCES; do
-    INSTANCE_CLASS=$(aws rds describe-db-instances --region "$REGION" \
-                    --db-instance-identifier "$DB_ID" \
-                    --query "DBInstances[0].DBInstanceClass" --output text)
+  # Get DB instances in region
+  DB_INSTANCES=$(aws rds describe-db-instances \
+      --region "$REGION" \
+      --query "DBInstances[].{ID:DBInstanceIdentifier, Class:DBInstanceClass}" \
+      --output json)
 
-    TAGS=$(aws rds list-tags-for-resource \
-           --region "$REGION" \
-           --resource-name arn:aws:rds:$REGION:$ACCOUNT_ID:db:$DB_ID \
-           --query "TagList[].Key" --output text)
+  DB_COUNT=$(echo "$DB_INSTANCES" | jq length)
+  if [[ "$DB_COUNT" -eq 0 ]]; then
+    echo "No DB instances in region $REGION"
+    continue
+  fi
 
-    if [[ ! " ${TAGS[@]} " =~ " RPO " ]]; then
-      echo "$ACCOUNT_ID,$REGION,$DB_ID,$INSTANCE_CLASS" >> "$REPORT_FILE"
+  for i in $(seq 0 $((DB_COUNT - 1))); do
+    DB_ID=$(echo "$DB_INSTANCES" | jq -r ".[$i].ID")
+    CLASS=$(echo "$DB_INSTANCES" | jq -r ".[$i].Class")
+    DB_ARN="arn:aws:rds:$REGION:$ACCOUNT_ID:db:$DB_ID"
+
+    echo "Checking tags for $DB_ID in $REGION"
+
+    # Try to get tags; handle failures gracefully
+    TAG_KEYS=$(aws rds list-tags-for-resource \
+        --region "$REGION" \
+        --resource-name "$DB_ARN" \
+        --query "TagList[].Key" \
+        --output text 2>/dev/null || true)
+
+    if [[ -z "$TAG_KEYS" || ! "$TAG_KEYS" =~ RPO ]]; then
+      echo "$ACCOUNT_ID,$REGION,$DB_ID,$CLASS" >> "$REPORT_FILE"
     fi
   done
 done
 
-echo "✅ Report saved to $REPORT_FILE"
+echo "✅ Done. Report saved to $REPORT_FILE"
