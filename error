@@ -2,3 +2,9 @@
 2. List only those buckets where the replication role is missing the AWS managed “S3FullAccess” policy 
 3. Remediate such roles, identified in step 2, by attaching the S3FullAccess policy 
 
+Write script using bash and aws cli for the following: 
+1. Identify all load balancers in the awsuat account that have only HTTP listeners 
+2. Create a csv file with the following headers (and list LB attributes under those headers):  
+                  Region, LB Name, app, bu, env, Security group id, number_of_targets 
+3. Run this bash script using Jenkins (via Jenkinsfile) and email the csv file to your Guardian email address 
+
