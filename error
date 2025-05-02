@@ -1,6 +1,10 @@
-Write a bash script using AWS CLI to identify all RDS instances missing a given tag (missing tag called “RPO”).  
-The script should then generate a report in csv format with the following columns: 
-•	AWS Account number 
-•	AWS Region Name 
-•	RDS Instance Identifier 
-•	RDS Instance size 
+Warning: Reference to undefined provider
+│
+│   on main.tf line 10, in module "account_a_sns_publisher":
+│   10:     aws = aws.account_a
+│
+│ There is no explicit declaration for local provider name "aws" in module.account_a_sns_publisher, so Terraform is assuming you mean to pass a configuration for "hashicorp/aws".
+│
+│ If you also control the child module, add a required_providers entry named "aws" with the source address "hashicorp/aws".
+│
+│ (and one more similar warning elsewhere)
