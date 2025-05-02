@@ -1,10 +1,1 @@
-Warning: Reference to undefined provider
-│
-│   on main.tf line 10, in module "account_a_sns_publisher":
-│   10:     aws = aws.account_a
-│
-│ There is no explicit declaration for local provider name "aws" in module.account_a_sns_publisher, so Terraform is assuming you mean to pass a configuration for "hashicorp/aws".
-│
-│ If you also control the child module, add a required_providers entry named "aws" with the source address "hashicorp/aws".
-│
-│ (and one more similar warning elsewhere)
+ A data resource "aws_securitygroup" "default" has not been declared in module.account_b_sqs_consumer
