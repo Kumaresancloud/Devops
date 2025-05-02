@@ -1,1 +1,6 @@
- A data resource "aws_securitygroup" "default" has not been declared in module.account_b_sqs_consumer
+│ Error: Missing required argument
+│
+│   on main.tf line 7, in module "account_a_sns_publisher":
+│    7: module "account_a_sns_publisher" {
+│
+│ The argument "sg_name" is required, but no definition was found.
