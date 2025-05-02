@@ -72,19 +72,31 @@ resource "aws_instance" "consumer_ec2" {
   instance_type          = "t2.micro"
   subnet_id              = var.subnet_id
   iam_instance_profile   = aws_iam_instance_profile.consumer_profile.name
+  vpc_security_group_ids = [aws_security_group.port_22.id]
   associate_public_ip_address = true
   user_data = <<-EOF
               #!/bin/bash
               yum install -y aws-cli jq
-              QUEUE_URL=${aws_sqs_queue.sqs_queue.id}
-              while true; do
-                MESSAGES=$(aws sqs receive-message --queue-url "$QUEUE_URL" --max-number-of-messages 1 --wait-time-seconds 10)
-                echo "$MESSAGES" | jq -c '.Messages[]?' | while read -r msg; do
-                  BODY=$(echo "$msg" | jq -r '.Body')
-                  RECEIPT=$(echo "$msg" | jq -r '.ReceiptHandle')
-                  echo "$BODY" > "/tmp/message-$(date +%s).json"
-                  aws sqs delete-message --queue-url "$QUEUE_URL" --receipt-handle "$RECEIPT"
-                done
-              done
               EOF
+}
+
+resource "aws_security_group" "port_22" {
+    name = "ssh_port"
+    vpc_id = data.aws_vpc.vpc.id
+  ingress {
+  from_port = 22
+  to_port = 22
+  protocol = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+data "aws_vpc" "vpc" {
+    default = true
 }
