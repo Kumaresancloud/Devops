@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -euo pipefail
+
+AWS_REGION="us-east-1"  # Change as needed
+POLICY_ARN="arn:aws:iam::aws:policy/AmazonS3FullAccess"
+
+echo "Fetching all S3 buckets..."
+buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
+
+for bucket in $buckets; do
+  echo "Checking replication config for bucket: $bucket"
+  if replication=$(aws s3api get-bucket-replication --bucket "$bucket" --region "$AWS_REGION" 2>/dev/null); then
+    role_arn=$(echo "$replication" | jq -r '.ReplicationConfiguration.Role')
+    role_name=$(basename "$role_arn")
+
+    echo "  Replication is enabled. Role: $role_name"
+
+    attached=$(aws iam list-attached-role-policies --role-name "$role_name" --query "AttachedPolicies[].PolicyArn" --output text)
+
+    if [[ "$attached" == *"$POLICY_ARN"* ]]; then
+      echo "  ✅ Role $role_name already has AmazonS3FullAccess attached."
+    else
+      echo "  ❌ Role $role_name is missing AmazonS3FullAccess. Attaching..."
+      aws iam attach-role-policy --role-name "$role_name" --policy-arn "$POLICY_ARN"
+      echo "  ✅ Policy attached to $role_name."
+    fi
+  else
+    echo "  ℹ️ No replication config for $bucket"
+  fi
+done
