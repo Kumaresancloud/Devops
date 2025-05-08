@@ -1,3 +1,1 @@
-1. Identify all s3 buckets where replication is enabled 
-2. List only those buckets where the replication role is missing the AWS managed “S3FullAccess” policy 
-3. Remediate such roles, identified in step 2, by attaching the S3FullAccess policy 
+An error occurred (AccessDenied) when calling the ListAttachedRolePolicies operation: User: arn:aws:sts::486416464124:assumed-role/S3_bucket_replication_filter/i-080ff624518c24898 is not authorized to perform: iam:ListAttachedRolePolicies on resource: role s3crr_role_for_1-mm-test because no identity-based policy allows the iam:ListAttachedRolePolicies action 
