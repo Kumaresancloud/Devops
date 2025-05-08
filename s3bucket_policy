@@ -1,34 +1,46 @@
 #!/bin/bash
 
-set -euo pipefail
-
-echo "Fetching buckets with replication enabled and validating roles..."
-echo "Bucket Name,Replication Status,Role Name,Policy Attached" > replication_audit.csv
-
-AWS_REGION="us-east-1"
 POLICY_ARN="arn:aws:iam::aws:policy/AmazonS3FullAccess"
+OUTPUT_FILE="replication_enabled_buckets.csv"
+
+echo "Bucket Name,Role ARN,Remediation" > "$OUTPUT_FILE"
 
 buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
 
 for bucket in $buckets; do
-  replication=$(aws s3api get-bucket-replication --bucket "$bucket" --region "$AWS_REGION" 2>/dev/null)
+  echo "Checking bucket: $bucket"
+
+  replication=$(aws s3api get-bucket-replication --bucket "$bucket" 2>/dev/null)
 
   if [ $? -eq 0 ]; then
-    role_arn=$(echo "$replication" | jq -r '.ReplicationConfiguration.Role')
+    # Replication is enabled
+    role_arn=$(echo "$replication" | jq -r '.Role // empty')
+
+    if [[ -z "$role_arn" ]]; then
+      echo "$bucket,N/A,Replication role not found" >> "$OUTPUT_FILE"
+      continue
+    fi
+
     role_name=$(basename "$role_arn")
 
-    echo "  ➤ $bucket has replication. Role: $role_name"
+    # Check if the role exists
+    if ! aws iam get-role --role-name "$role_name" >/dev/null 2>&1; then
+      echo "$bucket,$role_arn,Role not found or cross-account" >> "$OUTPUT_FILE"
+      continue
+    fi
 
-    attached_policies=$(aws iam list-attached-role-policies --role-name "$role_name" --query "AttachedPolicies[].PolicyArn" --output text)
+    # List attached policies
+    attached=$(aws iam list-attached-role-policies --role-name "$role_name" --query "AttachedPolicies[].PolicyArn" --output text)
 
-    if [[ "$attached_policies" == *"$POLICY_ARN"* ]]; then
-      echo "$bucket,Enabled,$role_name,Attached" >> replication_audit.csv
+    if echo "$attached" | grep -q "$POLICY_ARN"; then
+      echo "$bucket,$role_arn,Already has S3FullAccess" >> "$OUTPUT_FILE"
     else
-      echo "    ❌ $role_name missing AmazonS3FullAccess. Attaching..."
+      # Attach policy
+      echo "Attaching AmazonS3FullAccess to $role_name..."
       aws iam attach-role-policy --role-name "$role_name" --policy-arn "$POLICY_ARN"
-      echo "$bucket,Enabled,$role_name,Now Attached" >> replication_audit.csv
+      echo "$bucket,$role_arn,Attached S3FullAccess" >> "$OUTPUT_FILE"
     fi
   fi
 done
 
-echo "✅ Audit complete. See 'replication_audit.csv'"
+echo "Done! See '$OUTPUT_FILE'"
