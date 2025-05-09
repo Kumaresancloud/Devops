@@ -1,2 +1,1 @@
-✅ Replication enabled for glic-worm-testing-source
-🔗 Replication role ARN:
+glic-worm-testing-source,arn:aws:iam::486416464124:role/service-role/s3crr_role_for_glic-worm-testing-source,Role not found or cross-account
