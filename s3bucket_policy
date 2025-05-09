@@ -5,42 +5,42 @@ OUTPUT_FILE="replication_enabled_buckets.csv"
 
 echo "Bucket Name,Role ARN,Remediation" > "$OUTPUT_FILE"
 
-# Get all bucket names into an array
-buckets_array=($(aws s3api list-buckets --query "Buckets[].Name" --output text))
-total=${#buckets_array[@]}
-
-replication_enabled=0
+# Initialize counters
+replication_enabled_count=0
 remediated_count=0
+skipped_count=0
 
-# Loop through each bucket
-for i in "${!buckets_array[@]}"; do
-  bucket="${buckets_array[$i]}"
-  echo "[$((i+1))/$total] Checking bucket: $bucket"
+# List all S3 buckets
+buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
+
+for bucket in $buckets; do
+  echo "Checking bucket: $bucket"
 
   replication=$(aws s3api get-bucket-replication --bucket "$bucket" 2>/dev/null)
 
   if [ $? -eq 0 ]; then
-    ((replication_enabled++))
+    ((replication_enabled_count++))
     role_arn=$(echo "$replication" | jq -r '.Role // empty')
 
     if [[ -z "$role_arn" ]]; then
       echo "$bucket,N/A,Replication role not found" >> "$OUTPUT_FILE"
+      ((skipped_count++))
       continue
     fi
 
     role_name=$(basename "$role_arn")
 
-    # Check if the role exists
     if ! aws iam get-role --role-name "$role_name" >/dev/null 2>&1; then
       echo "$bucket,$role_arn,Role not found or cross-account" >> "$OUTPUT_FILE"
+      ((skipped_count++))
       continue
     fi
 
-    # List attached policies
     attached=$(aws iam list-attached-role-policies --role-name "$role_name" --query "AttachedPolicies[].PolicyArn" --output text)
 
     if echo "$attached" | grep -q "$POLICY_ARN"; then
       echo "$bucket,$role_arn,Already has S3FullAccess" >> "$OUTPUT_FILE"
+      ((skipped_count++))
     else
       echo "Attaching AmazonS3FullAccess to $role_name..."
       aws iam attach-role-policy --role-name "$role_name" --policy-arn "$POLICY_ARN"
@@ -50,9 +50,9 @@ for i in "${!buckets_array[@]}"; do
   fi
 done
 
-echo ""
-echo "======== Summary ========"
-echo "Total buckets checked:       $total"
-echo "Replication enabled buckets: $replication_enabled"
-echo "Buckets remediated:          $remediated_count"
-echo "Output written to:           $OUTPUT_FILE"
+# Final summary
+echo "Done! See '$OUTPUT_FILE'"
+echo "-----------------------------------------"
+echo "Buckets with replication enabled : $replication_enabled_count"
+echo "Buckets remediated               : $remediated_count"
+echo "Buckets skipped                  : $skipped_count"
