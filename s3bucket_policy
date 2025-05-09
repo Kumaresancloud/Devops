@@ -5,54 +5,55 @@ OUTPUT_FILE="replication_enabled_buckets.csv"
 
 echo "Bucket Name,Role ARN,Remediation" > "$OUTPUT_FILE"
 
-# Initialize counters
-replication_enabled_count=0
-remediated_count=0
-skipped_count=0
-
-# List all S3 buckets
 buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
 
 for bucket in $buckets; do
-  echo "Checking bucket: $bucket"
+  echo "🔍 Checking bucket: $bucket"
 
   replication=$(aws s3api get-bucket-replication --bucket "$bucket" 2>/dev/null)
 
   if [ $? -eq 0 ]; then
-    ((replication_enabled_count++))
+    echo "✅ Replication enabled for $bucket"
+
     role_arn=$(echo "$replication" | jq -r '.Role // empty')
+    echo "🔗 Replication role ARN: $role_arn"
 
     if [[ -z "$role_arn" ]]; then
+      echo "⚠️ Role ARN not found in replication config for $bucket"
       echo "$bucket,N/A,Replication role not found" >> "$OUTPUT_FILE"
-      ((skipped_count++))
       continue
     fi
 
     role_name=$(basename "$role_arn")
+    echo "🧾 Extracted role name: $role_name"
 
     if ! aws iam get-role --role-name "$role_name" >/dev/null 2>&1; then
+      echo "❌ Role $role_name not found or cross-account for $bucket"
       echo "$bucket,$role_arn,Role not found or cross-account" >> "$OUTPUT_FILE"
-      ((skipped_count++))
       continue
     fi
 
+    echo "🔍 Checking attached policies for role $role_name..."
     attached=$(aws iam list-attached-role-policies --role-name "$role_name" --query "AttachedPolicies[].PolicyArn" --output text)
 
+    echo "📋 Attached policies: $attached"
+
     if echo "$attached" | grep -q "$POLICY_ARN"; then
+      echo "✅ Role $role_name already has AmazonS3FullAccess"
       echo "$bucket,$role_arn,Already has S3FullAccess" >> "$OUTPUT_FILE"
-      ((skipped_count++))
     else
-      echo "Attaching AmazonS3FullAccess to $role_name..."
-      aws iam attach-role-policy --role-name "$role_name" --policy-arn "$POLICY_ARN"
-      echo "$bucket,$role_arn,Attached S3FullAccess" >> "$OUTPUT_FILE"
-      ((remediated_count++))
+      echo "🛠️ Attaching AmazonS3FullAccess to $role_name..."
+      if aws iam attach-role-policy --role-name "$role_name" --policy-arn "$POLICY_ARN"; then
+        echo "✅ Policy attached successfully"
+        echo "$bucket,$role_arn,Attached S3FullAccess" >> "$OUTPUT_FILE"
+      else
+        echo "❌ Failed to attach policy to $role_name"
+        echo "$bucket,$role_arn,Failed to attach policy" >> "$OUTPUT_FILE"
+      fi
     fi
+  else
+    echo "⏩ Skipping $bucket — replication not enabled"
   fi
 done
 
-# Final summary
-echo "Done! See '$OUTPUT_FILE'"
-echo "-----------------------------------------"
-echo "Buckets with replication enabled : $replication_enabled_count"
-echo "Buckets remediated               : $remediated_count"
-echo "Buckets skipped                  : $skipped_count"
+echo "🎯 Script complete. See '$OUTPUT_FILE'"
