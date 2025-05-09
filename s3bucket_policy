@@ -5,15 +5,22 @@ OUTPUT_FILE="replication_enabled_buckets.csv"
 
 echo "Bucket Name,Role ARN,Remediation" > "$OUTPUT_FILE"
 
-buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
+# Get all bucket names into an array
+buckets_array=($(aws s3api list-buckets --query "Buckets[].Name" --output text))
+total=${#buckets_array[@]}
 
-for bucket in $buckets; do
-  echo "Checking bucket: $bucket"
+replication_enabled=0
+remediated_count=0
+
+# Loop through each bucket
+for i in "${!buckets_array[@]}"; do
+  bucket="${buckets_array[$i]}"
+  echo "[$((i+1))/$total] Checking bucket: $bucket"
 
   replication=$(aws s3api get-bucket-replication --bucket "$bucket" 2>/dev/null)
 
   if [ $? -eq 0 ]; then
-    # Replication is enabled
+    ((replication_enabled++))
     role_arn=$(echo "$replication" | jq -r '.Role // empty')
 
     if [[ -z "$role_arn" ]]; then
@@ -35,12 +42,17 @@ for bucket in $buckets; do
     if echo "$attached" | grep -q "$POLICY_ARN"; then
       echo "$bucket,$role_arn,Already has S3FullAccess" >> "$OUTPUT_FILE"
     else
-      # Attach policy
       echo "Attaching AmazonS3FullAccess to $role_name..."
       aws iam attach-role-policy --role-name "$role_name" --policy-arn "$POLICY_ARN"
       echo "$bucket,$role_arn,Attached S3FullAccess" >> "$OUTPUT_FILE"
+      ((remediated_count++))
     fi
   fi
 done
 
-echo "Done! See '$OUTPUT_FILE'"
+echo ""
+echo "======== Summary ========"
+echo "Total buckets checked:       $total"
+echo "Replication enabled buckets: $replication_enabled"
+echo "Buckets remediated:          $remediated_count"
+echo "Output written to:           $OUTPUT_FILE"
