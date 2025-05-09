@@ -1,5 +1,2 @@
-======== Summary ========
-Total buckets checked:       468
-Replication enabled buckets: 8
-Buckets remediated:          0
-Output written to:           replication_enabled_buckets.csv
+✅ Replication enabled for glic-worm-testing-source
+🔗 Replication role ARN:
