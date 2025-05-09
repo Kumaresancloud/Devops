@@ -1,1 +1,5 @@
-An error occurred (NoSuchEntity) when calling the ListAttachedRolePolicies operation: The role with name s3crr_role_for_1-mm-test cannot be found.
+======== Summary ========
+Total buckets checked:       468
+Replication enabled buckets: 8
+Buckets remediated:          0
+Output written to:           replication_enabled_buckets.csv
