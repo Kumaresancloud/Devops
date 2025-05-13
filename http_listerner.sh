@@ -1,42 +1,45 @@
 #!/bin/bash
 
-set -euo pipefail
+OUTPUT_FILE="lb_http_only.csv"
+echo "Region,LB Name,app,bu,env,Security group id,number_of_targets" > "$OUTPUT_FILE"
 
-REPORT="http_only_lbs_report.csv"
-echo "Region,LB Name,App,BU,Env,Security Group ID,Number of Targets" > "$REPORT"
+regions=$(aws ec2 describe-regions --query "Regions[].RegionName" --output text)
 
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGIONS=$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)
+for region in $regions; do
+  echo "Checking region: $region"
 
-for REGION in $REGIONS; do
-  echo "🔍 Checking region: $REGION"
-  LBS=$(aws elbv2 describe-load-balancers --region "$REGION" --query 'LoadBalancers[].LoadBalancerArn' --output text)
+  lbs=$(aws elbv2 describe-load-balancers --region "$region" --query 'LoadBalancers[?Type==`application`].LoadBalancerArn' --output text)
 
-  for LB_ARN in $LBS; do
-    # Get listener protocols
-    LISTENER_PROTOCOLS=$(aws elbv2 describe-listeners --region "$REGION" --load-balancer-arn "$LB_ARN" --query 'Listeners[].Protocol' --output text)
+  for lb_arn in $lbs; do
+    # Get listeners
+    listeners=$(aws elbv2 describe-listeners --load-balancer-arn "$lb_arn" --region "$region")
+    total_listeners=$(echo "$listeners" | jq '.Listeners | length')
+    http_listeners=$(echo "$listeners" | jq '[.Listeners[] | select(.Port == 80)]')
+    http_count=$(echo "$http_listeners" | jq 'length')
 
-    # Filter out LBs with only HTTP
-    if [[ "$LISTENER_PROTOCOLS" =~ ^HTTP$ ]]; then
-      LB_DESC=$(aws elbv2 describe-load-balancers --region "$REGION" --load-balancer-arns "$LB_ARN" --query 'LoadBalancers[0]' --output json)
-      LB_NAME=$(echo "$LB_DESC" | jq -r '.LoadBalancerName')
-      SG_ID=$(echo "$LB_DESC" | jq -r '.SecurityGroups[0]')
+    # Only include LBs with *only* HTTP listeners
+    if [[ "$total_listeners" -gt 0 && "$http_count" -eq "$total_listeners" ]]; then
+      lb_info=$(aws elbv2 describe-load-balancers --load-balancer-arns "$lb_arn" --region "$region")
+      lb_name=$(echo "$lb_info" | jq -r '.LoadBalancers[0].LoadBalancerName')
+      sg_id=$(echo "$lb_info" | jq -r '.LoadBalancers[0].SecurityGroups[0]')
 
-      TAGS=$(aws elbv2 describe-tags --region "$REGION" --resource-arns "$LB_ARN" --query 'TagDescriptions[0].Tags' --output json)
-      APP=$(echo "$TAGS" | jq -r '.[] | select(.Key=="app") | .Value // "N/A"')
-      BU=$(echo "$TAGS" | jq -r '.[] | select(.Key=="bu") | .Value // "N/A"')
-      ENV=$(echo "$TAGS" | jq -r '.[] | select(.Key=="env") | .Value // "N/A"')
+      # Tags
+      tags=$(aws elbv2 describe-tags --resource-arns "$lb_arn" --region "$region")
+      app=$(echo "$tags" | jq -r '.TagDescriptions[0].Tags[] | select(.Key=="app") | .Value')
+      bu=$(echo "$tags" | jq -r '.TagDescriptions[0].Tags[] | select(.Key=="bu") | .Value')
+      env=$(echo "$tags" | jq -r '.TagDescriptions[0].Tags[] | select(.Key=="env") | .Value')
 
-      TARGET_GROUPS=$(aws elbv2 describe-target-groups --region "$REGION" --load-balancer-arn "$LB_ARN" --query 'TargetGroups[].TargetGroupArn' --output text)
-      NUM_TARGETS=0
-      for TG_ARN in $TARGET_GROUPS; do
-        COUNT=$(aws elbv2 describe-target-health --region "$REGION" --target-group-arn "$TG_ARN" --query 'TargetHealthDescriptions' --output json | jq length)
-        NUM_TARGETS=$((NUM_TARGETS + COUNT))
+      # Count targets
+      target_count=0
+      for tg_arn in $(echo "$http_listeners" | jq -r '.[].DefaultActions[].TargetGroupArn'); do
+        count=$(aws elbv2 describe-target-health --target-group-arn "$tg_arn" --region "$region" \
+                | jq '.TargetHealthDescriptions | length')
+        target_count=$((target_count + count))
       done
 
-      echo "$REGION,$LB_NAME,$APP,$BU,$ENV,$SG_ID,$NUM_TARGETS" >> "$REPORT"
+      echo "$region,$lb_name,$app,$bu,$env,$sg_id,$target_count" >> "$OUTPUT_FILE"
     fi
   done
 done
 
-echo "Report generated: $REPORT"
+echo "Report generated: $OUTPUT_FILE"
