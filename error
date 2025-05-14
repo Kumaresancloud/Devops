@@ -1,5 +1,114 @@
-Write script using bash and aws cli for the following: 
-1. Identify all load balancers in the awsuat account that have only HTTP listeners 
-2. Create a csv file with the following headers (and list LB attributes under those headers):  
-                  Region, LB Name, app, bu, env, Security group id, number_of_targets 
-3. Run this bash script using Jenkins (via Jenkinsfile) and email the csv file to your gmail email address
+import groovy.json.JsonSlurperClassic
+def assume_role(String accountId, String deployer = 'standard-deployer', String id = '123') {
+  echo "\033[33m[INFO] Assuming ${deployer} role in account: " + accountId + "...\033[0m"
+  env.ACCOUNT_ID=accountId
+  env.DEPLOYER=deployer
+  env.ID=id
+  if (id == '') {
+    data=sh(script: '''aws sts assume-role \
+            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOYER}" \
+            --role-session-name "AWSCLI-Session" \
+            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+            --output json''', returnStdout: true)  
+  } else {
+    data=sh(script: '''aws sts assume-role \
+            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOYER}" \
+            --external-id "${ID}" --role-session-name "AWSCLI-Session" \
+            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+            --output json''', returnStdout: true)
+  }
+  def jsonSlurper = new JsonSlurperClassic()
+  def tokens = jsonSlurper.parseText(data)
+  env.AWS_ACCESS_KEY_ID=tokens[0]
+  env.AWS_SECRET_ACCESS_KEY=tokens[1]
+  env.AWS_SESSION_TOKEN=tokens[2]
+  echo "\033[1;32m[SUCCESS] Successfuly assumed ${deployer} role in account: " + accountId + "\033[0m"
+
+}
+
+def labels = 'awsuat-it-tfdeployer'
+def account = '0143'
+def codedeployrole = ""
+def REGION = 'us-east-1'
+node('awsuat-it-tfdeployer') {
+  properties([
+    parameters([
+        choice(name: 'ACCOUNT', choices:  ['awsuat','awsimd(individual-markets)', 'awsgrpd(group)', 'awsdld(datalake)'], description: 'Please select the Account'),
+        choice(name: 'Region', choices:  ['us-east-1'], description: 'Please select the region'),
+    ])
+  ])
+  if (params.ACCOUNT == "individual-markets")
+  {
+    labels = 'awsimd-tfdeployer'
+    account = '423'
+  }
+  
+   if (params.ACCOUNT == "group")
+  {
+
+    labels = 'awsgrpd-tfdeployer'
+    account = '323'
+
+  }
+   if (params.ACCOUNT == "datalake")
+  {
+    labels = 'awsdld-tfdeployer'
+    account = '567'
+    
+  }  
+}
+  
+pipeline
+{
+    agent { label "${labels}" }
+    stages {
+        stage('assumeRole') {
+            when{
+                expression { params.ACCOUNT != "awsuat" }
+            }
+            steps {
+                script
+                {
+                    if(params.ACCOUNT == "group") {
+                      assume_role('323', 'standard-deployer', '123')
+                    } 
+                    else if(params.ACCOUNT == "individual-markets") {
+                      assume_role('423', 'standard-deployer', '123')
+                      
+                    }
+                    else if(params.ACCOUNT == "datalake") {
+                      assume_role('567', 'standard-deployer', '123')
+                      
+                    }
+
+                }
+            }
+        }
+      
+        stage('run')
+        {
+          steps {
+            sh "chmod +x -R ${env.WORKSPACE}"
+            sh "./http/bash.sh"
+            
+          }
+        }
+    }
+
+    post {
+    always {
+        script {
+            currentBuild.result = currentBuild.result ?: 'SUCCESS'
+        }
+        emailext (
+            attachLog: true,
+            subject: ' http_loadbalancer',
+            body: '''<h3> http_loadbalancer </h3>
+            <p>JENKINS_JOB_URL: ${BUILD_URL}</p>''',
+            attachmentsPattern: '*.csv',
+            to: "kumaresan_gopalakrishnan@gmail.com"
+        )
+    }
+  }
+}
+
