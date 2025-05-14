@@ -3,46 +3,46 @@ bash
 Copy
 Edit
 aws elbv2 describe-load-balancers --region <region>
-📘 Docs: describe-load-balancers
+📘 Docs: https://docs.aws.amazon.com/cli/latest/reference/elbv2/describe-load-balancers.html
 
 2. Get Listeners for a Load Balancer
 bash
 Copy
 Edit
 aws elbv2 describe-listeners --region <region> --load-balancer-arn <LB_ARN>
-📘 Docs: describe-listeners
+📘 Docs: https://docs.aws.amazon.com/cli/latest/reference/elbv2/describe-listeners.html
 
 3. Get Load Balancer Tags
 bash
 Copy
 Edit
 aws elbv2 describe-tags --region <region> --resource-arns <LB_ARN>
-📘 Docs: describe-tags
+📘 Docs: https://docs.aws.amazon.com/cli/latest/reference/elbv2/describe-tags.html
 
 4. Get Target Groups Associated with a Load Balancer
 bash
 Copy
 Edit
 aws elbv2 describe-target-groups --region <region> --load-balancer-arn <LB_ARN>
-📘 Docs: describe-target-groups
+📘 Docs: https://docs.aws.amazon.com/cli/latest/reference/elbv2/describe-target-groups.html
 
 5. Get Target Health for a Target Group
 bash
 Copy
 Edit
 aws elbv2 describe-target-health --region <region> --target-group-arn <TG_ARN>
-📘 Docs: describe-target-health
+📘 Docs: https://docs.aws.amazon.com/cli/latest/reference/elbv2/describe-target-health.html
 
 6. Assume IAM Role (Used in Jenkinsfile)
 bash
 Copy
 Edit
 aws sts assume-role --role-arn <ARN> --role-session-name <session> [--external-id <id>]
-📘 Docs: assume-role
+📘 Docs: https://docs.aws.amazon.com/cli/latest/reference/sts/assume-role.html
 
 7. Get Caller Identity (Optional)
 bash
 Copy
 Edit
 aws sts get-caller-identity --query Account --output text
-📘 Docs: get-caller-identity
+📘 Docs: https://docs.aws.amazon.com/cli/latest/reference/sts/get-caller-identity.html
