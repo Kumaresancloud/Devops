@@ -1,3 +1,40 @@
+pipeline {
+  agent any
 
+  environment {
+    REGION = 'us-east-1'  // Set the region to use in the script
+  }
 
-An error occurred (LoadBalancerNotFound) when calling the DescribeListeners operation: Load balancer 'arn:aws:elasticloadbalancing:us-east-1:092741386116:loadbalancer/app/dss-jenkins-ha-devmaster-alb/a00a0ba14178003e' not found
+  stages {
+    stage('Prepare') {
+      steps {
+        sh 'chmod +x ./http/bash.sh'
+      }
+    }
+
+    stage('Generate Report') {
+      steps {
+        sh './http/bash.sh'
+      }
+    }
+
+    stage('Archive Report') {
+      steps {
+        archiveArtifacts artifacts: 'http_only_lbs_report.csv', fingerprint: true
+      }
+    }
+  }
+
+  post {
+    always {
+      emailext(
+        subject: "HTTP-only Load Balancer Report - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        body: """<h3>HTTP-only Load Balancer Report</h3>
+                <p>Build URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>""",
+        attachLog: true,
+        attachmentsPattern: 'http_only_lbs_report.csv',
+        to: 'your.email@domain.com'
+      )
+    }
+  }
+}
