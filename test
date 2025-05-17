@@ -26,11 +26,11 @@ def assume_role(String accountId, String deployer = 'stanoyer', String id = 'y2j
 
 }
 
-def labels = 'awsuat-it-tfdeployer'
-def account = '092741386116'
+def labels = 'awsoyer'
+def account = '09'
 def codedeployrole = ""
 def REGION = 'us-east-1'
-node('awsuat-it-tfdeployer') {
+node('awsoyer') {
   properties([
     parameters([
         choice(name: 'ACCOUNT', choices:  ['awsit','queen', 'take', 'king'], description: 'Please select the Account'),
