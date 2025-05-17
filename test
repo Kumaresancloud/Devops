@@ -1,40 +1,113 @@
-pipeline {
-  agent any
-
-  environment {
-    REGION = 'us-east-1'  // Set the region to use in the script
+import groovy.json.JsonSlurperClassic
+def assume_role(String accountId, String deployer = 'stanoyer', String id = 'y2j') {
+  echo "\033[33m[INFO] Assuming ${deployer} role in account: " + accountId + "...\033[0m"
+  env.ACCOUNT_ID=accountId
+  env.DEPLOYER=deployer
+  env.ID=id
+  if (id == '') {
+    data=sh(script: '''aws sts assume-role \
+            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOYER}" \
+            --role-session-name "AWSCLI-Session" \
+            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+            --output json''', returnStdout: true)  
+  } else {
+    data=sh(script: '''aws sts assume-role \
+            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOYER}" \
+            --external-id "${ID}" --role-session-name "AWSCLI-Session" \
+            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+            --output json''', returnStdout: true)
   }
+  def jsonSlurper = new JsonSlurperClassic()
+  def tokens = jsonSlurper.parseText(data)
+  env.AWS_ACCESS_KEY_ID=tokens[0]
+  env.AWS_SECRET_ACCESS_KEY=tokens[1]
+  env.AWS_SESSION_TOKEN=tokens[2]
+  echo "\033[1;32m[SUCCESS] Successfuly assumed ${deployer} role in account: " + accountId + "\033[0m"
 
-  stages {
-    stage('Prepare') {
-      steps {
-        sh 'chmod +x ./http/bash.sh'
-      }
-    }
-
-    stage('Generate Report') {
-      steps {
-        sh './http/bash.sh'
-      }
-    }
-
-    stage('Archive Report') {
-      steps {
-        archiveArtifacts artifacts: 'http_only_lbs_report.csv', fingerprint: true
-      }
-    }
-  }
-
-  post {
-    always {
-      emailext(
-        subject: "HTTP-only Load Balancer Report - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-        body: """<h3>HTTP-only Load Balancer Report</h3>
-                <p>Build URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>""",
-        attachLog: true,
-        attachmentsPattern: 'http_only_lbs_report.csv',
-        to: 'your.email@domain.com'
-      )
-    }
-  }
 }
+
+def labels = 'awsuat-it-tfdeployer'
+def account = '092741386116'
+def codedeployrole = ""
+def REGION = 'us-east-1'
+node('awsuat-it-tfdeployer') {
+  properties([
+    parameters([
+        choice(name: 'ACCOUNT', choices:  ['awsit','queen', 'take', 'king'], description: 'Please select the Account'),
+        choice(name: 'Region', choices:  ['us-east-1'], description: 'Please select the region'),
+        string(name: 'Instance_ID', description: 'Please enter instance id to change'),
+        //booleanParam(name: 'Change Instancetype', defaultValue: true, description: 'Just to get inventory'),
+        //string(defaultValue: '', description: 'pass the MAL_ID/APP_ID value', name: 'MAL_ID', trim: false),
+        //string(name: 'TO_EMAIL', defaultValue: "", description: 'Please pass space seperated values'),
+    ])
+  ])
+  if (params.ACCOUNT == "queen")
+  {
+    labels = 'awsimooyer'
+    account = '18'
+  }
+  
+   if (params.ACCOUNT == "take")
+  {
+
+    labels = 'awsgoyer'
+    account = '37'
+
+  }
+   if (params.ACCOUNT == "king")
+  {
+    labels = 'awsdoyer'
+    account = '21'
+    
+  }  
+}
+  
+pipeline
+{
+    agent { label "${labels}" }
+    stages {
+        stage('assumeRole') {
+            when{
+                expression { params.ACCOUNT != "awsit" }
+            }
+            steps {
+                script
+                {
+                    if(params.ACCOUNT == "take") {
+                      assume_role('', 'standard-deployer', 'y2j')
+                    } 
+                    else if(params.ACCOUNT == "king") {
+                      assume_role('', 'standard-deployer', 'y2j')
+                      
+                    }
+                    else if(params.ACCOUNT == "queen") {
+                      assume_role('', 'standard-deployer', 'y2j')
+                      
+                    }
+
+                }
+            }
+        }
+      
+        stage('run')
+        {
+          steps {
+            sh "chmod +x -R ${env.WORKSPACE}"
+            sh "./http/bash.sh"
+            
+          }
+        }
+    }
+
+    post {
+    always {
+        script {
+            currentBuild.result = currentBuild.result ?: 'SUCCESS'
+        }
+        emailext (
+            attachLog: true,
+            subject: ' Instance Type change job executed for ${Instance_ID}',
+            body: '''<h3> Instance Type change job executed for ${Instance_ID} </h3>
+            <p>JENKINS_JOB_URL: ${BUILD_URL}</p>''',
+            attachmentsPattern: '*.csv',
+            to: "kumaresan_gopalakrishnan@glic.com"
