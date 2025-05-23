@@ -1,96 +1,46 @@
-import groovy.json.JsonSlurperClassic
-def assume_role(String accountId, String deployer = 'standard-deployer', String id = 't40-0Kt@VO') {
-  echo "\033[33m[INFO] Assuming ${deployer} role in account: " + accountId + "...\033[0m"
-  env.ACCOUNT_ID=accountId
-  env.DEPLOYER=deployer
-  env.ID=id
-  if (id == '') {
-    data=sh(script: '''aws sts assume-role \
-            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOYER}" \
-            --role-session-name "AWSCLI-Session" \
-            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-            --output json''', returnStdout: true)  
-  } else {
-    data=sh(script: '''aws sts assume-role \
-            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOYER}" \
-            --external-id "${ID}" --role-session-name "AWSCLI-Session" \
-            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-            --output json''', returnStdout: true)
-  }
-  def jsonSlurper = new JsonSlurperClassic()
-  def tokens = jsonSlurper.parseText(data)
-  env.AWS_ACCESS_KEY_ID=tokens[0]
-  env.AWS_SECRET_ACCESS_KEY=tokens[1]
-  env.AWS_SESSION_TOKEN=tokens[2]
-  echo "\033[1;32m[SUCCESS] Successfuly assumed ${deployer} role in account: " + accountId + "\033[0m"
+pipeline {
+    agent { label 'awsuat-it-tfdeployer' }
 
-}
+    environment {
+        REGION = 'us-east-1'
+    }
 
-def labels = 'awsuat-it-tfdeployer'
-def account = '0123'
-def codedeployrole = ""
-def REGION = 'us-east-1'
-node('awsuat-it-tfdeployer') {
-  properties([
-    parameters([
-        choice(name: 'ACCOUNT', choices:  ['awsuat','awsimd(individual-markets)', 'awsgrpd(group)', 'awsdld(datalake)'], description: 'Please select the Account'),
-        choice(name: 'Region', choices:  ['us-east-1'], description: 'Please select the region'),
-        //string(name: 'Instance_ID', description: 'Please enter instance id to change'),
-        //booleanParam(name: 'Change Instancetype', defaultValue: true, description: 'Just to get inventory'),
-        //string(defaultValue: '', description: 'pass the MAL_ID/APP_ID value', name: 'MAL_ID', trim: false),
-        //string(name: 'TO_EMAIL', defaultValue: "", description: 'Please pass space seperated values'),
-    ])
-  ])
-  if (params.ACCOUNT == "individual-markets")
-  {
-    labels = 'awsimd-tfdeployer'
-    account = '186602574267'
-  }  
-}
-  
-pipeline
-{
-    agent { label "${labels}" }
+    parameters {
+        choice(name: 'ACCOUNT', choices: ['awsuat'], description: 'This pipeline only supports awsuat')
+        choice(name: 'Region', choices: ['us-east-1'], description: 'AWS Region')
+    }
+
     stages {
-        stage('assumeRole') {
-            when{
-                expression { params.ACCOUNT != "awsuat" }
-            }
+        stage('Prepare Script') {
             steps {
-                script
-                {
-                      if(params.ACCOUNT == "individual-markets") {
-                      assume_role('1123', 'standard-deployer', 't40-0Kt@VO')
-                      
-                    }
-
-                }
+                echo "Selected Account: ${params.ACCOUNT}"
+                echo "Region: ${params.Region}"
+                sh 'chmod +x ./http/bash.sh'
             }
         }
-      
-        stage('run')
-        {
-          steps {
-            sh "chmod +x -R ${env.WORKSPACE}"
-            sh "./http/bash.sh"
-            
-          }
+
+        stage('Run HTTP-only Load Balancer Report') {
+            steps {
+                sh './http/bash.sh'
+            }
         }
     }
 
     post {
-    always {
-        script {
-            currentBuild.result = currentBuild.result ?: 'SUCCESS'
+        always {
+            script {
+                currentBuild.result = currentBuild.result ?: 'SUCCESS'
+            }
+            emailext (
+                attachLog: true,
+                subject: 'HTTP Load Balancer Report for awsuat',
+                body: '''
+                    <h3>HTTP-only Load Balancer Report for awsuat</h3>
+                    <p>Build URL: ${BUILD_URL}</p>
+                ''',
+                attachmentsPattern: '*.csv',
+                to: 'kumaresan_gopalakrishnan@glic.com'
+            )
         }
-        emailext (
-            attachLog: true,
-            subject: ' http load balancer details ',
-            body: '''<h3> http load balancer details </h3>
-            <p>JENKINS_JOB_URL: ${BUILD_URL}</p>''',
-            attachmentsPattern: '*.csv',
-            to: "kumaresan_gopalakrishnan@glic.com"
-        )
     }
-  }
 }
