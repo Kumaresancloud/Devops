@@ -1,113 +1,34 @@
-import groovy.json.JsonSlurperClassic
-def assume_role(String accountId, String deployer = 'stanoyer', String id = 'y2j') {
-  echo "\033[33m[INFO] Assuming ${deployer} role in account: " + accountId + "...\033[0m"
-  env.ACCOUNT_ID=accountId
-  env.DEPLOYER=deployer
-  env.ID=id
-  if (id == '') {
-    data=sh(script: '''aws sts assume-role \
-            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOYER}" \
-            --role-session-name "AWSCLI-Session" \
-            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-            --output json''', returnStdout: true)  
-  } else {
-    data=sh(script: '''aws sts assume-role \
-            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOYER}" \
-            --external-id "${ID}" --role-session-name "AWSCLI-Session" \
-            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-            --output json''', returnStdout: true)
+pipeline {
+  agent { label 'awsoyer' }
+
+  parameters {
+    choice(name: 'ACCOUNT', choices: ['awsit', 'queen', 'take', 'king'], description: 'Select the Account')
+    choice(name: 'Region', choices: ['us-east-1'], description: 'Select the Region')
+    string(name: 'Instance_ID', description: 'Enter Instance ID')
   }
-  def jsonSlurper = new JsonSlurperClassic()
-  def tokens = jsonSlurper.parseText(data)
-  env.AWS_ACCESS_KEY_ID=tokens[0]
-  env.AWS_SECRET_ACCESS_KEY=tokens[1]
-  env.AWS_SESSION_TOKEN=tokens[2]
-  echo "\033[1;32m[SUCCESS] Successfuly assumed ${deployer} role in account: " + accountId + "\033[0m"
 
-}
-
-def labels = 'awsoyer'
-def account = '09'
-def codedeployrole = ""
-def REGION = 'us-east-1'
-node('awsoyer') {
-  properties([
-    parameters([
-        choice(name: 'ACCOUNT', choices:  ['awsit','queen', 'take', 'king'], description: 'Please select the Account'),
-        choice(name: 'Region', choices:  ['us-east-1'], description: 'Please select the region'),
-        string(name: 'Instance_ID', description: 'Please enter instance id to change'),
-        //booleanParam(name: 'Change Instancetype', defaultValue: true, description: 'Just to get inventory'),
-        //string(defaultValue: '', description: 'pass the MAL_ID/APP_ID value', name: 'MAL_ID', trim: false),
-        //string(name: 'TO_EMAIL', defaultValue: "", description: 'Please pass space seperated values'),
-    ])
-  ])
-  if (params.ACCOUNT == "queen")
-  {
-    labels = 'awsimooyer'
-    account = '18'
-  }
-  
-   if (params.ACCOUNT == "take")
-  {
-
-    labels = 'awsgoyer'
-    account = '37'
-
-  }
-   if (params.ACCOUNT == "king")
-  {
-    labels = 'awsdoyer'
-    account = '21'
-    
-  }  
-}
-  
-pipeline
-{
-    agent { label "${labels}" }
-    stages {
-        stage('assumeRole') {
-            when{
-                expression { params.ACCOUNT != "awsit" }
-            }
-            steps {
-                script
-                {
-                    if(params.ACCOUNT == "take") {
-                      assume_role('', 'standard-deployer', 'y2j')
-                    } 
-                    else if(params.ACCOUNT == "king") {
-                      assume_role('', 'standard-deployer', 'y2j')
-                      
-                    }
-                    else if(params.ACCOUNT == "queen") {
-                      assume_role('', 'standard-deployer', 'y2j')
-                      
-                    }
-
-                }
-            }
-        }
-      
-        stage('run')
-        {
-          steps {
-            sh "chmod +x -R ${env.WORKSPACE}"
-            sh "./http/bash.sh"
-            
-          }
-        }
+  stages {
+    stage('Run for awsit only') {
+      when {
+        expression { params.ACCOUNT == "awsit" }
+      }
+      steps {
+        sh "chmod +x -R ${env.WORKSPACE}"
+        sh "./http/bash.sh"
+      }
     }
+  }
 
-    post {
+  post {
     always {
-        script {
-            currentBuild.result = currentBuild.result ?: 'SUCCESS'
-        }
-        emailext (
-            attachLog: true,
-            subject: ' Instance Type change job executed for ${Instance_ID}',
-            body: '''<h3> Instance Type change job executed for ${Instance_ID} </h3>
-            <p>JENKINS_JOB_URL: ${BUILD_URL}</p>''',
-            attachmentsPattern: '*.csv',
-            to: "kumaresan_gopalakrishnan@glic.com"
+      emailext(
+        attachLog: true,
+        subject: 'Instance Type change job executed for ${Instance_ID}',
+        body: """<h3>Instance Type change job executed for ${Instance_ID}</h3>
+                 <p>JENKINS_JOB_URL: ${BUILD_URL}</p>""",
+        attachmentsPattern: '*.csv',
+        to: "kumaresan_gopalakrishnan@glic.com"
+      )
+    }
+  }
+}
