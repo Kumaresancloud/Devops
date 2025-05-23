@@ -1,1 +1,29 @@
-pdckr_pat_EUbLnz9qd0tKV-13SNxMj6Dp6Q0
+cat <<EOF > index.html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Welcome</title>
+</head>
+<body>
+  <h1 style="text-align:center;margin-top:20%;">Welcome, Kumaresan!</h1>
+</body>
+</html>
+EOF
+
+
+cat <<EOF > Dockerfile
+FROM nginx:alpine
+COPY index.html /usr/share/nginx/html/index.html
+EOF
+
+docker build -t kumaresan-nginx .
+
+docker run -d -p 8080:80 --name my-nginx kumaresan-nginx
+
+# Tag your image
+docker tag kumaresan-nginx your-dockerhub-username/kumaresan-nginx:latest
+
+# Push it
+docker push your-dockerhub-username/kumaresan-nginx:latest
+
+
