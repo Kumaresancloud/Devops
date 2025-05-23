@@ -1,41 +1,96 @@
-#!/bin/bash
+import groovy.json.JsonSlurperClassic
+def assume_role(String accountId, String deployer = 'standard-deployer', String id = 't40-0Kt@VO') {
+  echo "\033[33m[INFO] Assuming ${deployer} role in account: " + accountId + "...\033[0m"
+  env.ACCOUNT_ID=accountId
+  env.DEPLOYER=deployer
+  env.ID=id
+  if (id == '') {
+    data=sh(script: '''aws sts assume-role \
+            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOYER}" \
+            --role-session-name "AWSCLI-Session" \
+            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+            --output json''', returnStdout: true)  
+  } else {
+    data=sh(script: '''aws sts assume-role \
+            --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/${DEPLOYER}" \
+            --external-id "${ID}" --role-session-name "AWSCLI-Session" \
+            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+            --output json''', returnStdout: true)
+  }
+  def jsonSlurper = new JsonSlurperClassic()
+  def tokens = jsonSlurper.parseText(data)
+  env.AWS_ACCESS_KEY_ID=tokens[0]
+  env.AWS_SECRET_ACCESS_KEY=tokens[1]
+  env.AWS_SESSION_TOKEN=tokens[2]
+  echo "\033[1;32m[SUCCESS] Successfuly assumed ${deployer} role in account: " + accountId + "\033[0m"
 
-set -euo pipefail
+}
 
-REGION="us-east-1"
-REPORT="http_only_lbs_report.csv"
-echo "Region,LB Name,App,BU,Env,Security Group ID,Number of Targets" > "$REPORT"
+def labels = 'awsuat-it-tfdeployer'
+def account = '0123'
+def codedeployrole = ""
+def REGION = 'us-east-1'
+node('awsuat-it-tfdeployer') {
+  properties([
+    parameters([
+        choice(name: 'ACCOUNT', choices:  ['awsuat','awsimd(individual-markets)', 'awsgrpd(group)', 'awsdld(datalake)'], description: 'Please select the Account'),
+        choice(name: 'Region', choices:  ['us-east-1'], description: 'Please select the region'),
+        //string(name: 'Instance_ID', description: 'Please enter instance id to change'),
+        //booleanParam(name: 'Change Instancetype', defaultValue: true, description: 'Just to get inventory'),
+        //string(defaultValue: '', description: 'pass the MAL_ID/APP_ID value', name: 'MAL_ID', trim: false),
+        //string(name: 'TO_EMAIL', defaultValue: "", description: 'Please pass space seperated values'),
+    ])
+  ])
+  if (params.ACCOUNT == "individual-markets")
+  {
+    labels = 'awsimd-tfdeployer'
+    account = '186602574267'
+  }  
+}
+  
+pipeline
+{
+    agent { label "${labels}" }
+    stages {
+        stage('assumeRole') {
+            when{
+                expression { params.ACCOUNT != "awsuat" }
+            }
+            steps {
+                script
+                {
+                      if(params.ACCOUNT == "individual-markets") {
+                      assume_role('1123', 'standard-deployer', 't40-0Kt@VO')
+                      
+                    }
 
-# Get all ALBs in the region
-LBS=$(aws elbv2 describe-load-balancers --region "$REGION" --query 'LoadBalancers[].LoadBalancerArn' --output text)
+                }
+            }
+        }
+      
+        stage('run')
+        {
+          steps {
+            sh "chmod +x -R ${env.WORKSPACE}"
+            sh "./http/bash.sh"
+            
+          }
+        }
+    }
 
-for LB_ARN in $LBS; do
-  # Get all listener protocols
-  LISTENER_PROTOCOLS=$(aws elbv2 describe-listeners --region "$REGION" --load-balancer-arn "$LB_ARN" --query 'Listeners[].Protocol' --output text)
-
-  # Check if only HTTP listeners are present
-  if [[ "$LISTENER_PROTOCOLS" =~ ^HTTP$ ]]; then
-    LB_DESC=$(aws elbv2 describe-load-balancers --region "$REGION" --load-balancer-arns "$LB_ARN" --query 'LoadBalancers[0]' --output json)
-    LB_NAME=$(echo "$LB_DESC" | jq -r '.LoadBalancerName')
-    SG_ID=$(echo "$LB_DESC" | jq -r '.SecurityGroups[0]')
-
-    # Extract tags
-    TAGS=$(aws elbv2 describe-tags --region "$REGION" --resource-arns "$LB_ARN" --query 'TagDescriptions[0].Tags' --output json)
-    APP=$(echo "$TAGS" | jq -r '.[] | select(.Key=="app") | .Value // "N/A"')
-    BU=$(echo "$TAGS" | jq -r '.[] | select(.Key=="bu") | .Value // "N/A"')
-    ENV=$(echo "$TAGS" | jq -r '.[] | select(.Key=="env") | .Value // "N/A"')
-
-    # Count targets
-    TARGET_GROUPS=$(aws elbv2 describe-target-groups --region "$REGION" --load-balancer-arn "$LB_ARN" --query 'TargetGroups[].TargetGroupArn' --output text)
-    NUM_TARGETS=0
-    for TG_ARN in $TARGET_GROUPS; do
-      COUNT=$(aws elbv2 describe-target-health --region "$REGION" --target-group-arn "$TG_ARN" --query 'TargetHealthDescriptions' --output json | jq length)
-      NUM_TARGETS=$((NUM_TARGETS + COUNT))
-    done
-
-    echo "$REGION,$LB_NAME,$APP,$BU,$ENV,$SG_ID,$NUM_TARGETS" >> "$REPORT"
-  fi
-done
-
-echo "CSV report generated: $REPORT"
-
+    post {
+    always {
+        script {
+            currentBuild.result = currentBuild.result ?: 'SUCCESS'
+        }
+        emailext (
+            attachLog: true,
+            subject: ' http load balancer details ',
+            body: '''<h3> http load balancer details </h3>
+            <p>JENKINS_JOB_URL: ${BUILD_URL}</p>''',
+            attachmentsPattern: '*.csv',
+            to: "kumaresan_gopalakrishnan@glic.com"
+        )
+    }
+  }
+}
